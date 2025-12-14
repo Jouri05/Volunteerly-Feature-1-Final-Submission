@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'task.dart';
-import 'task_storage.dart';
+import 'models/task.dart';
+import 'services/task_storage.dart';
+import 'task_list_screen.dart';
 
 class AddTaskScreen extends StatefulWidget {
   const AddTaskScreen({super.key});
@@ -16,6 +17,62 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
 
   String? selectedPriority;
   final List<String> priorities = ["Low", "Medium", "High"];
+
+  @override
+  void dispose() {
+    hoursController.dispose();
+    dateController.dispose();
+    descriptionController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveTask() async {
+    final hours = hoursController.text.trim();
+    final date = dateController.text.trim();
+    final desc = descriptionController.text.trim();
+    final priority = selectedPriority ?? '';
+
+    if (desc.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a description here.')),
+      );
+      return;
+    }
+
+    final titleParts = <String>[];
+    if (hours.isNotEmpty) titleParts.add('Hours: $hours');
+    if (priority.isNotEmpty) titleParts.add('Priority: $priority');
+    if (date.isNotEmpty) titleParts.add('Due: $date');
+
+    final title = titleParts.isEmpty ? 'New Task' : titleParts.join(' • ');
+
+    final task = Task(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: title,
+      description: desc,
+      isDone: false,
+    );
+
+    await TaskStorage.addTask(task);
+
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const TaskListScreen()),
+    );
+  }
+
+  void _clearForm() {
+    hoursController.clear();
+    dateController.clear();
+    descriptionController.clear();
+    setState(() => selectedPriority = null);
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Form cleared.')));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,12 +104,13 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
             const SizedBox(height: 5),
             DropdownButtonFormField<String>(
               value: selectedPriority,
-              items: priorities.map((level) {
-                return DropdownMenuItem(value: level, child: Text(level));
-              }).toList(),
-              onChanged: (value) {
-                setState(() => selectedPriority = value);
-              },
+              items: priorities
+                  .map(
+                    (level) =>
+                        DropdownMenuItem(value: level, child: Text(level)),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => selectedPriority = value),
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 hintText: "Select priority",
@@ -84,7 +142,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green.shade200,
                 ),
-                onPressed: () {},
+                onPressed: _saveTask,
                 child: const Text(
                   "Done",
                   style: TextStyle(fontSize: 20, color: Colors.black),
@@ -99,7 +157,7 @@ class _AddTaskScreenState extends State<AddTaskScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red.shade200,
                 ),
-                onPressed: () {},
+                onPressed: _clearForm,
                 child: const Text(
                   "Delete",
                   style: TextStyle(fontSize: 20, color: Colors.black),
